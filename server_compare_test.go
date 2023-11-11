@@ -10,13 +10,13 @@ import (
 type compareKnownValues struct{}
 
 func (compareKnownValues) Compare(boundDN string, req CompareRequest, conn net.Conn) (LDAPResultCode, error) {
-	if req.dn != "cn=myUser,dc=example,dc=com" {
+	if req.DN != "cn=myUser,dc=example,dc=com" {
 		// unknown dn
 		return LDAPResultCompareFalse, nil
 	}
 
-	for _, ava := range req.ava {
-		if ava.attributeDesc != "myAttribute" || ava.assertionValue != "myValue" {
+	for _, ava := range req.AVA {
+		if ava.AttributeDesc != "myAttribute" || ava.AssertionValue != "myValue" {
 			// unheld assertion
 			return LDAPResultCompareFalse, nil
 		}
