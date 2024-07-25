@@ -5,22 +5,14 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestAdd(t *testing.T) {
-	quit := make(chan bool)
-	done := make(chan bool)
-	go func() {
-		s := NewServer()
-		s.QuitChannel(quit)
-		s.BindFunc("", modifyTestHandler{})
-		s.AddFunc("", modifyTestHandler{})
-		if err := s.ListenAndServe(listenString); err != nil {
-			t.Errorf("s.ListenAndServe failed: %s", err.Error())
-		}
-	}()
-	go func() {
+	s := NewServer()
+	s.BindFunc("", modifyTestHandler{})
+	s.AddFunc("", modifyTestHandler{})
+
+	LaunchServerForTest(t, s, func() {
 		cmd := exec.Command("ldapadd", "-v", "-H", ldapURL, "-x", "-f", "tests/add.ldif")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "modify complete") {
@@ -34,29 +26,15 @@ func TestAdd(t *testing.T) {
 		if strings.Contains(string(out), "modify complete") {
 			t.Errorf("ldapadd should have failed: %v", string(out))
 		}
-		done <- true
-	}()
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Errorf("ldapadd command timed out")
-	}
-	quit <- true
+	})
 }
 
 func TestDelete(t *testing.T) {
-	quit := make(chan bool)
-	done := make(chan bool)
-	go func() {
-		s := NewServer()
-		s.QuitChannel(quit)
-		s.BindFunc("", modifyTestHandler{})
-		s.DeleteFunc("", modifyTestHandler{})
-		if err := s.ListenAndServe(listenString); err != nil {
-			t.Errorf("s.ListenAndServe failed: %s", err.Error())
-		}
-	}()
-	go func() {
+	s := NewServer()
+	s.BindFunc("", modifyTestHandler{})
+	s.DeleteFunc("", modifyTestHandler{})
+
+	LaunchServerForTest(t, s, func() {
 		cmd := exec.Command("ldapdelete", "-v", "-H", ldapURL, "-x", "cn=Delete Me,dc=example,dc=com")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "Delete Result: Success (0)") || !strings.Contains(string(out), "Additional info: Success") {
@@ -67,29 +45,14 @@ func TestDelete(t *testing.T) {
 		if strings.Contains(string(out), "Success") || !strings.Contains(string(out), "ldap_delete: Insufficient access") {
 			t.Errorf("ldapdelete should have failed: %v", string(out))
 		}
-		done <- true
-	}()
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Errorf("ldapdelete command timed out")
-	}
-	quit <- true
+	})
 }
 
 func TestModify(t *testing.T) {
-	quit := make(chan bool)
-	done := make(chan bool)
-	go func() {
-		s := NewServer()
-		s.QuitChannel(quit)
-		s.BindFunc("", modifyTestHandler{})
-		s.ModifyFunc("", modifyTestHandler{})
-		if err := s.ListenAndServe(listenString); err != nil {
-			t.Errorf("s.ListenAndServe failed: %s", err.Error())
-		}
-	}()
-	go func() {
+	s := NewServer()
+	s.BindFunc("", modifyTestHandler{})
+	s.ModifyFunc("", modifyTestHandler{})
+	LaunchServerForTest(t, s, func() {
 		cmd := exec.Command("ldapmodify", "-v", "-H", ldapURL, "-x", "-f", "tests/modify.ldif")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "modify complete") {
@@ -100,30 +63,16 @@ func TestModify(t *testing.T) {
 		if !strings.Contains(string(out), "ldap_modify: Insufficient access") || strings.Contains(string(out), "modify complete") {
 			t.Errorf("ldapmodify should have failed: %v", string(out))
 		}
-		done <- true
-	}()
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Errorf("ldapadd command timed out")
-	}
-	quit <- true
+	})
 }
 
 /*
 func TestModifyDN(t *testing.T) {
-	quit := make(chan bool)
-	done := make(chan bool)
-	go func() {
-		s := NewServer()
-		s.QuitChannel(quit)
-		s.BindFunc("", modifyTestHandler{})
-		s.AddFunc("", modifyTestHandler{})
-		if err := s.ListenAndServe(listenString); err != nil {
-			t.Errorf("s.ListenAndServe failed: %s", err.Error())
-		}
-	}()
-	go func() {
+	s := NewServer()
+	s.BindFunc("", modifyTestHandler{})
+	s.AddFunc("", modifyTestHandler{})
+
+	LaunchServerForTest(t, s, func() {
 		cmd := exec.Command("ldapadd", "-v", "-H", ldapURL, "-x", "-f", "tests/add.ldif")
 		//ldapmodrdn -H ldap://localhost:3389 -x "uid=babs,dc=example,dc=com" "uid=babsy,dc=example,dc=com"
 		out, _ := cmd.CombinedOutput()
@@ -138,14 +87,7 @@ func TestModifyDN(t *testing.T) {
 		if strings.Contains(string(out), "modify complete") {
 			t.Errorf("ldapadd should have failed: %v", string(out))
 		}
-		done <- true
-	}()
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Errorf("ldapadd command timed out")
-	}
-	quit <- true
+	})
 }
 */
 

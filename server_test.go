@@ -18,208 +18,149 @@ var (
 	serverBaseDN = "o=testers,c=test"
 )
 
-// ///////////////////////
-func TestBindAnonOK(t *testing.T) {
-	quit := make(chan bool)
-	done := make(chan bool)
+func LaunchWorkerForTest(t *testing.T, worker func(should_quit chan (bool)), test func()) {
+	worker_should_quit := make(chan bool)
+	worker_has_quit := make(chan bool)
+	test_done := make(chan bool)
+
 	go func() {
-		s := NewServer()
-		s.QuitChannel(quit)
-		s.BindFunc("", bindAnonOK{})
+		worker(worker_should_quit)
+		worker_has_quit <- true
+	}()
+
+	// time.Sleep(serverStartDelay)
+
+	go func() {
+		test()
+		test_done <- true
+	}()
+
+	select {
+	case <-test_done:
+	case <-time.After(timeout):
+		t.Errorf("test func timed out")
+	}
+
+	select {
+	case worker_should_quit <- true:
+		<-worker_has_quit
+	case <-worker_has_quit:
+	}
+}
+
+func LaunchServerForTest(t *testing.T, s *Server, test func()) {
+	LaunchWorkerForTest(t, func(server_should_quit chan (bool)) {
+		s.QuitChannel(server_should_quit)
 		if err := s.ListenAndServe(listenString); err != nil {
 			t.Errorf("s.ListenAndServe failed: %s", err.Error())
 		}
-	}()
+	}, test)
+}
 
-	go func() {
+// ///////////////////////
+func TestBindAnonOK(t *testing.T) {
+	s := NewServer()
+	s.BindFunc("", bindAnonOK{})
+	LaunchServerForTest(t, s, func() {
 		cmd := exec.Command("ldapsearch", "-H", ldapURL, "-x", "-b", "o=testers,c=test")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "result: 0 Success") {
 			t.Errorf("ldapsearch failed: %v", string(out))
 		}
-		done <- true
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Errorf("ldapsearch command timed out")
-	}
-	quit <- true
+	})
 }
 
 // ///////////////////////
 func TestBindAnonFail(t *testing.T) {
-	quit := make(chan bool)
-	done := make(chan bool)
-	go func() {
-		s := NewServer()
-		s.QuitChannel(quit)
-		if err := s.ListenAndServe(listenString); err != nil {
-			t.Errorf("s.ListenAndServe failed: %s", err.Error())
-		}
-	}()
-
-	time.Sleep(timeout)
-	go func() {
+	LaunchServerForTest(t, NewServer(), func() {
 		cmd := exec.Command("ldapsearch", "-H", ldapURL, "-x", "-b", "o=testers,c=test")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "ldap_bind: Invalid credentials (49)") {
 			t.Errorf("ldapsearch failed: %v", string(out))
 		}
-		done <- true
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Errorf("ldapsearch command timed out")
-	}
-	time.Sleep(timeout)
-	quit <- true
+	})
 }
 
 // ///////////////////////
 func TestBindSimpleOK(t *testing.T) {
-	quit := make(chan bool)
-	done := make(chan bool)
-	go func() {
-		s := NewServer()
-		s.QuitChannel(quit)
-		s.SearchFunc("", searchSimple{})
-		s.BindFunc("", bindSimple{})
-		if err := s.ListenAndServe(listenString); err != nil {
-			t.Errorf("s.ListenAndServe failed: %s", err.Error())
-		}
-	}()
+	s := NewServer()
+	s.SearchFunc("", searchSimple{})
+	s.BindFunc("", bindSimple{})
 
 	serverBaseDN := "o=testers,c=test"
 
-	go func() {
+	LaunchServerForTest(t, s, func() {
 		cmd := exec.Command("ldapsearch", "-H", ldapURL, "-x",
 			"-b", serverBaseDN, "-D", "cn=testy,"+serverBaseDN, "-w", "iLike2test")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "result: 0 Success") {
 			t.Errorf("ldapsearch failed: %v", string(out))
 		}
-		done <- true
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Errorf("ldapsearch command timed out")
-	}
-	quit <- true
+	})
 }
 
 // ///////////////////////
 func TestBindSimpleFailBadPw(t *testing.T) {
-	quit := make(chan bool)
-	done := make(chan bool)
-	go func() {
-		s := NewServer()
-		s.QuitChannel(quit)
-		s.BindFunc("", bindSimple{})
-		if err := s.ListenAndServe(listenString); err != nil {
-			t.Errorf("s.ListenAndServe failed: %s", err.Error())
-		}
-	}()
+	s := NewServer()
+	s.BindFunc("", bindSimple{})
 
 	serverBaseDN := "o=testers,c=test"
 
-	go func() {
+	LaunchServerForTest(t, s, func() {
 		cmd := exec.Command("ldapsearch", "-H", ldapURL, "-x",
 			"-b", serverBaseDN, "-D", "cn=testy,"+serverBaseDN, "-w", "BADPassword")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "ldap_bind: Invalid credentials (49)") {
 			t.Errorf("ldapsearch succeeded - should have failed: %v", string(out))
 		}
-		done <- true
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Errorf("ldapsearch command timed out")
-	}
-	quit <- true
+	})
 }
 
 // ///////////////////////
 func TestBindSimpleFailBadDn(t *testing.T) {
-	quit := make(chan bool)
-	done := make(chan bool)
-	go func() {
-		s := NewServer()
-		s.QuitChannel(quit)
-		s.BindFunc("", bindSimple{})
-		if err := s.ListenAndServe(listenString); err != nil {
-			t.Errorf("s.ListenAndServe failed: %s", err.Error())
-		}
-	}()
+	s := NewServer()
+	s.BindFunc("", bindSimple{})
 
 	serverBaseDN := "o=testers,c=test"
 
-	go func() {
+	LaunchServerForTest(t, s, func() {
 		cmd := exec.Command("ldapsearch", "-H", ldapURL, "-x",
 			"-b", serverBaseDN, "-D", "cn=testoy,"+serverBaseDN, "-w", "iLike2test")
 		out, _ := cmd.CombinedOutput()
 		if string(out) != "ldap_bind: Invalid credentials (49)\n" {
 			t.Errorf("ldapsearch succeeded - should have failed: %v", string(out))
 		}
-		done <- true
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Errorf("ldapsearch command timed out")
-	}
-	quit <- true
+	})
 }
 
 // ///////////////////////
 func TestBindSSL(t *testing.T) {
 	ldapURLSSL := "ldaps://" + listenString
-	longerTimeout := 300 * time.Millisecond
-	quit := make(chan bool)
-	done := make(chan bool)
-	go func() {
+
+	LaunchWorkerForTest(t, func(server_should_quit chan (bool)) {
+		// worker: run LDAP server with TLS
 		s := NewServer()
-		s.QuitChannel(quit)
+		s.QuitChannel(server_should_quit)
 		s.BindFunc("", bindAnonOK{})
 		if err := s.ListenAndServeTLS(listenString, "tests/cert_DONOTUSE.pem", "tests/key_DONOTUSE.pem"); err != nil {
 			t.Errorf("s.ListenAndServeTLS failed: %s", err.Error())
 		}
-	}()
-
-	go func() {
-		time.Sleep(longerTimeout * 2)
+	}, func() {
+		// test: connect to secure ldap server
 		cmd := exec.Command("ldapsearch", "-H", ldapURLSSL, "-x", "-b", "o=testers,c=test")
 		cmd.Env = append(cmd.Env, "LDAPTLS_REQCERT=never")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "result: 0 Success") {
 			t.Errorf("ldapsearch failed: %v", string(out))
 		}
-		done <- true
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(longerTimeout * 5):
-		t.Errorf("ldapsearch command timed out")
-	}
-	quit <- true
+	})
 }
 
 func TestBindStartTLS(t *testing.T) {
-	longerTimeout := 300 * time.Millisecond
-	quit := make(chan bool)
-	done := make(chan bool)
-	go func() {
+	LaunchWorkerForTest(t, func(server_should_quit chan (bool)) {
+		// worker: run LDAP server with STARTTLS
 		s := NewServer()
-		s.QuitChannel(quit)
+		s.QuitChannel(server_should_quit)
 		s.BindFunc("", bindAnonOK{})
 		cert, err := tls.LoadX509KeyPair("tests/cert_DONOTUSE.pem", "tests/key_DONOTUSE.pem")
 		if err != nil {
@@ -231,55 +172,28 @@ func TestBindStartTLS(t *testing.T) {
 		if err := s.ListenAndServe(listenString); err != nil {
 			t.Errorf("s.ListenAndServeTLS failed: %s", err.Error())
 		}
-	}()
-
-	go func() {
-		time.Sleep(longerTimeout * 2)
+	}, func() {
+		// test: connect to secure ldap server
 		cmd := exec.Command("ldapsearch", "-Z", "-H", ldapURL, "-x", "-b", "o=testers,c=test")
 		cmd.Env = append(cmd.Env, "LDAPTLS_REQCERT=never")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "result: 0 Success") {
 			t.Errorf("ldapsearch failed: %v", string(out))
 		}
-		done <- true
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(longerTimeout * 5):
-		t.Errorf("ldapsearch command timed out")
-	}
-	quit <- true
+	})
 }
 
 // ///////////////////////
 func TestBindPanic(t *testing.T) {
-	quit := make(chan bool)
-	done := make(chan bool)
-	go func() {
-		s := NewServer()
-		s.QuitChannel(quit)
-		s.BindFunc("", bindPanic{})
-		if err := s.ListenAndServe(listenString); err != nil {
-			t.Errorf("s.ListenAndServe failed: %s", err.Error())
-		}
-	}()
-
-	go func() {
+	s := NewServer()
+	s.BindFunc("", bindPanic{})
+	LaunchServerForTest(t, s, func() {
 		cmd := exec.Command("ldapsearch", "-H", ldapURL, "-x", "-b", "o=testers,c=test")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "ldap_bind: Operations error") {
 			t.Errorf("ldapsearch should have returned operations error due to panic: %v", string(out))
 		}
-		done <- true
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Errorf("ldapsearch command timed out")
-	}
-	quit <- true
+	})
 }
 
 // ///////////////////////
@@ -296,41 +210,24 @@ func TestSearchStats(t *testing.T) {
 	w := testStatsWriter{&bytes.Buffer{}}
 	log.SetOutput(w)
 
-	quit := make(chan bool)
-	done := make(chan bool)
 	s := NewServer()
+	s.SearchFunc("", searchSimple{})
+	s.BindFunc("", bindAnonOK{})
+	s.SetStats(true)
 
-	go func() {
-		s.QuitChannel(quit)
-		s.SearchFunc("", searchSimple{})
-		s.BindFunc("", bindAnonOK{})
-		s.SetStats(true)
-		if err := s.ListenAndServe(listenString); err != nil {
-			t.Errorf("s.ListenAndServe failed: %s", err.Error())
-		}
-	}()
-
-	go func() {
+	LaunchServerForTest(t, s, func() {
 		cmd := exec.Command("ldapsearch", "-H", ldapURL, "-x", "-b", "o=testers,c=test")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "result: 0 Success") {
 			t.Errorf("ldapsearch failed: %v", string(out))
 		}
-		done <- true
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Errorf("ldapsearch command timed out")
-	}
+	})
 
 	stats := s.GetStats()
 	log.Println(stats)
 	if stats.Conns != 1 || stats.Binds != 1 {
 		t.Errorf("Stats data missing or incorrect: %v", w.buffer.String())
 	}
-	quit <- true
 }
 
 // ///////////////////////
