@@ -317,7 +317,6 @@ func TestSearchScope(t *testing.T) {
 		if strings.Contains(string(out), "dn: cn=trent,o=testers,c=test") {
 			t.Errorf("ldapsearch 'base' scope failed - found unexpected DN: %v", string(out))
 		}
-
 	})
 }
 
@@ -371,6 +370,5 @@ func TestSearchControls(t *testing.T) {
 		if !strings.Contains(string(out), "numResponses: 1") {
 			t.Errorf("ldapsearch without control failed: %v", string(out))
 		}
-
 	})
 }
