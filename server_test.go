@@ -102,6 +102,35 @@ func TestBindSimpleOK(t *testing.T) {
 }
 
 // ///////////////////////
+func TestBindSASLExternal(t *testing.T) {
+	s := NewServer()
+	cert, err := tls.LoadX509KeyPair("tests/cert_server.pem", "tests/cert_server.key")
+	if err != nil {
+		t.Error(err)
+	}
+	s.StartTLS = &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequestClientCert,
+	}
+	s.SearchFunc("", searchSimple{})
+	s.BindFunc("", bindSimple{})
+
+	serverBaseDN := "o=testers,c=test"
+
+	LaunchServerForTest(t, s, func() {
+		cmd := exec.Command("ldapsearch", "-H", ldapURL,
+			"-b", serverBaseDN, "-D", "cn=testy,"+serverBaseDN, "-ZZ", "-Y", "EXTERNAL")
+		cmd.Env = append(cmd.Env, "LDAPTLS_CACERT=tests/ca.pem")
+		cmd.Env = append(cmd.Env, "LDAPTLS_CERT=tests/cert_client.pem")
+		cmd.Env = append(cmd.Env, "LDAPTLS_KEY=tests/cert_client.key")
+		out, _ := cmd.CombinedOutput()
+		if !strings.Contains(string(out), "result: 0 Success") {
+			t.Errorf("ldapsearch failed: %v", string(out))
+		}
+	})
+}
+
+// ///////////////////////
 func TestBindSimpleFailBadPw(t *testing.T) {
 	s := NewServer()
 	s.BindFunc("", bindSimple{})
@@ -246,6 +275,9 @@ type bindSimple struct{}
 
 func (b bindSimple) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
 	if req.BindDN == "cn=testy,o=testers,c=test" && req.Password == "iLike2test" {
+		return LDAPResultSuccess, nil
+	}
+	if req.TLS != nil && req.TLS.PeerCertificates[0].Subject.String() == "CN=client" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInvalidCredentials, nil
