@@ -7,9 +7,9 @@ package ldap
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 
-	"github.com/nmcclain/asn1-ber"
+	ber "github.com/nmcclain/asn1-ber"
 )
 
 // LDAP Application Codes
@@ -166,7 +166,7 @@ type AddRequest struct {
 	attributes []Attribute
 }
 type DeleteRequest struct {
-	dn string
+	DN string
 }
 type ModifyDNRequest struct {
 	dn           string
@@ -303,7 +303,7 @@ func addDefaultLDAPResponseDescriptions(packet *ber.Packet) {
 }
 
 func DebugBinaryFile(fileName string) error {
-	file, err := ioutil.ReadFile(fileName)
+	file, err := os.ReadFile(fileName)
 	if err != nil {
 		return NewError(ErrorDebugging, err)
 	}

@@ -36,15 +36,6 @@ func HandleSearchRequest(req *ber.Packet, controls *[]Control, messageID uint64,
 		return NewError(searchResp.ResultCode, err)
 	}
 
-	if server.EnforceLDAP {
-		if searchReq.DerefAliases != NeverDerefAliases { // [-a {never|always|search|find}
-			// TODO: Server DerefAliases not supported: RFC4511 4.5.1.3
-		}
-		if searchReq.TimeLimit > 0 {
-			// TODO: Server TimeLimit not implemented
-		}
-	}
-
 	i := 0
 	searchReqBaseDNLower := strings.ToLower(searchReq.BaseDN)
 	for _, entry := range searchResp.Entries {
@@ -101,39 +92,39 @@ func HandleSearchRequest(req *ber.Packet, controls *[]Control, messageID uint64,
 // ///////////////////////
 func parseSearchRequest(boundDN string, req *ber.Packet, controls *[]Control) (SearchRequest, error) {
 	if len(req.Children) != 8 {
-		return SearchRequest{}, NewError(LDAPResultOperationsError, errors.New("Bad search request"))
+		return SearchRequest{}, NewError(LDAPResultOperationsError, errors.New("bad search request"))
 	}
 
 	// Parse the request
 	baseObject, ok := req.Children[0].Value.(string)
 	if !ok {
-		return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("Bad search request"))
+		return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("bad search request"))
 	}
 	s, ok := req.Children[1].Value.(uint64)
 	if !ok {
-		return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("Bad search request"))
+		return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("bad search request"))
 	}
 	scope := int(s)
 	d, ok := req.Children[2].Value.(uint64)
 	if !ok {
-		return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("Bad search request"))
+		return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("bad search request"))
 	}
 	derefAliases := int(d)
 	s, ok = req.Children[3].Value.(uint64)
 	if !ok {
-		return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("Bad search request"))
+		return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("bad search request"))
 	}
 	sizeLimit := int(s)
 	t, ok := req.Children[4].Value.(uint64)
 	if !ok {
-		return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("Bad search request"))
+		return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("bad search request"))
 	}
 	timeLimit := int(t)
 	typesOnly := false
 	if req.Children[5].Value != nil {
 		typesOnly, ok = req.Children[5].Value.(bool)
 		if !ok {
-			return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("Bad search request"))
+			return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("bad search request"))
 		}
 	}
 	filter, err := DecompileFilter(req.Children[6])
@@ -144,7 +135,7 @@ func parseSearchRequest(boundDN string, req *ber.Packet, controls *[]Control) (S
 	for _, attr := range req.Children[7].Children {
 		a, ok := attr.Value.(string)
 		if !ok {
-			return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("Bad search request"))
+			return SearchRequest{}, NewError(LDAPResultProtocolError, errors.New("bad search request"))
 		}
 		attributes = append(attributes, a)
 	}
