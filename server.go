@@ -11,6 +11,8 @@ import (
 	ber "github.com/nmcclain/asn1-ber"
 )
 
+const TagResponseName uint8 = 0x8a
+
 type Binder interface {
 	Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error)
 }
@@ -335,9 +337,7 @@ handler:
 					response.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagEnumerated, uint64(ldapResultCode), "resultCode: "))
 					response.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, "", "matchedDN: "))
 					response.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, "", "errorMessage: "))
-					// No clue what 0x8a is, seems to be correct from testing
-					// value taken from looking at Samba's StartTLS via wireshark
-					response.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, 0x8a, name, "responseName: "))
+					response.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, TagResponseName, name, "responseName: "))
 					responsePacket.AppendChild(response)
 					// log.Println("START_TLS response")
 					// ber.PrintPacket(responsePacket)
