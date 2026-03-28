@@ -24,6 +24,7 @@ jobs:
       - run: |
           sudo apt update
           sudo apt install -y ldap-utils
+          sudo hostname server
       - name: Build
         run: go build -v ./...
       - name: Test
