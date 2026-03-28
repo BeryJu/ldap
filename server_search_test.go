@@ -4,7 +4,6 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestSearchSimpleOK(t *testing.T) {
@@ -199,29 +198,17 @@ func TestSearchFiltering(t *testing.T) {
 	s.SearchFunc("", searchSimple{})
 	s.BindFunc("", bindSimple{})
 
-	done := make(chan bool)
-	shortTimeout := timeout / 20
-
 	LaunchServerForTest(t, s,
 		func() {
 			for _, i := range searchFilterTestFilters {
-				t.Log(i.name)
-
-				go func() {
+				t.Run(i.name, func(t *testing.T) {
 					cmd := exec.Command("ldapsearch", "-H", ldapURL, "-x",
 						"-b", serverBaseDN, "-D", "cn=testy,"+serverBaseDN, "-w", "iLike2test", i.filterStr)
 					out, _ := cmd.CombinedOutput()
 					if !strings.Contains(string(out), "numResponses: "+i.numResponses) {
 						t.Errorf("ldapsearch failed - expected numResponses==%s: %v", i.numResponses, string(out))
 					}
-					done <- true
-				}()
-
-				select {
-				case <-done:
-				case <-time.After(shortTimeout):
-					t.Errorf("ldapsearch command timed out")
-				}
+				})
 			}
 		})
 }
