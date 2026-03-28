@@ -1,0 +1,8 @@
+{
+  "name": "ldap",
+  "dockerComposeFile": [
+    "docker-compose.yml"
+  ],
+  "service": "app",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}"
+}

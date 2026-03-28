@@ -19,6 +19,7 @@ var (
 )
 
 func LaunchWorkerForTest(t *testing.T, worker func(should_quit chan (bool)), test func()) {
+	t.Helper()
 	worker_should_quit := make(chan bool)
 	worker_has_quit := make(chan bool)
 	test_done := make(chan bool)
@@ -49,6 +50,7 @@ func LaunchWorkerForTest(t *testing.T, worker func(should_quit chan (bool)), tes
 }
 
 func LaunchServerForTest(t *testing.T, s *Server, test func()) {
+	t.Helper()
 	LaunchWorkerForTest(t, func(server_should_quit chan (bool)) {
 		s.QuitChannel(server_should_quit)
 		if err := s.ListenAndServe(listenString); err != nil {
@@ -100,6 +102,35 @@ func TestBindSimpleOK(t *testing.T) {
 }
 
 // ///////////////////////
+func TestBindSASLExternal(t *testing.T) {
+	s := NewServer()
+	cert, err := tls.LoadX509KeyPair("tests/cert_server.pem", "tests/cert_server.key")
+	if err != nil {
+		t.Error(err)
+	}
+	s.StartTLS = &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequestClientCert,
+	}
+	s.SearchFunc("", searchSimple{})
+	s.BindFunc("", bindSimple{})
+
+	serverBaseDN := "o=testers,c=test"
+
+	LaunchServerForTest(t, s, func() {
+		cmd := exec.Command("ldapsearch", "-H", ldapURL,
+			"-b", serverBaseDN, "-D", "cn=testy,"+serverBaseDN, "-ZZ", "-Y", "EXTERNAL")
+		cmd.Env = append(cmd.Env, "LDAPTLS_CACERT=tests/ca.pem")
+		cmd.Env = append(cmd.Env, "LDAPTLS_CERT=tests/cert_client.pem")
+		cmd.Env = append(cmd.Env, "LDAPTLS_KEY=tests/cert_client.key")
+		out, _ := cmd.CombinedOutput()
+		if !strings.Contains(string(out), "result: 0 Success") {
+			t.Errorf("ldapsearch failed: %v", string(out))
+		}
+	})
+}
+
+// ///////////////////////
 func TestBindSimpleFailBadPw(t *testing.T) {
 	s := NewServer()
 	s.BindFunc("", bindSimple{})
@@ -142,7 +173,7 @@ func TestBindSSL(t *testing.T) {
 		s := NewServer()
 		s.QuitChannel(server_should_quit)
 		s.BindFunc("", bindAnonOK{})
-		if err := s.ListenAndServeTLS(listenString, "tests/cert_DONOTUSE.pem", "tests/key_DONOTUSE.pem"); err != nil {
+		if err := s.ListenAndServeTLS(listenString, "tests/cert_server.pem", "tests/cert_server.key"); err != nil {
 			t.Errorf("s.ListenAndServeTLS failed: %s", err.Error())
 		}
 	}, func() {
@@ -162,7 +193,7 @@ func TestBindStartTLS(t *testing.T) {
 		s := NewServer()
 		s.QuitChannel(server_should_quit)
 		s.BindFunc("", bindAnonOK{})
-		cert, err := tls.LoadX509KeyPair("tests/cert_DONOTUSE.pem", "tests/key_DONOTUSE.pem")
+		cert, err := tls.LoadX509KeyPair("tests/cert_server.pem", "tests/cert_server.key")
 		if err != nil {
 			t.Error(err)
 		}
@@ -233,8 +264,8 @@ func TestSearchStats(t *testing.T) {
 // ///////////////////////
 type bindAnonOK struct{}
 
-func (b bindAnonOK) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
-	if bindDN == "" && bindSimplePw == "" {
+func (b bindAnonOK) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
+	if req.BindDN == "" && req.Password == "" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInvalidCredentials, nil
@@ -242,8 +273,11 @@ func (b bindAnonOK) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResult
 
 type bindSimple struct{}
 
-func (b bindSimple) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
-	if bindDN == "cn=testy,o=testers,c=test" && bindSimplePw == "iLike2test" {
+func (b bindSimple) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
+	if req.BindDN == "cn=testy,o=testers,c=test" && req.Password == "iLike2test" {
+		return LDAPResultSuccess, nil
+	}
+	if req.TLS != nil && req.TLS.PeerCertificates[0].Subject.String() == "CN=client" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInvalidCredentials, nil
@@ -251,8 +285,8 @@ func (b bindSimple) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResult
 
 type bindSimple2 struct{}
 
-func (b bindSimple2) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
-	if bindDN == "cn=testy,o=testers,c=testz" && bindSimplePw == "ZLike2test" {
+func (b bindSimple2) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
+	if req.BindDN == "cn=testy,o=testers,c=testz" && req.Password == "ZLike2test" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInvalidCredentials, nil
@@ -260,14 +294,14 @@ func (b bindSimple2) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResul
 
 type bindPanic struct{}
 
-func (b bindPanic) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindPanic) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
 	panic("test panic at the disco")
 }
 
 type bindCaseInsensitive struct{}
 
-func (b bindCaseInsensitive) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
-	if strings.ToLower(bindDN) == "cn=case,o=testers,c=test" && bindSimplePw == "iLike2test" {
+func (b bindCaseInsensitive) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
+	if strings.ToLower(req.BindDN) == "cn=case,o=testers,c=test" && req.Password == "iLike2test" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInvalidCredentials, nil

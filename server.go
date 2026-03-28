@@ -14,7 +14,7 @@ import (
 const TagResponseName uint8 = 0x8a
 
 type Binder interface {
-	Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error)
+	Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error)
 }
 type Searcher interface {
 	Search(boundDN string, req SearchRequest, conn net.Conn) (ServerSearchResult, error)
@@ -327,9 +327,6 @@ handler:
 				name := ber.DecodeString(req.Children[0].Data.Bytes())
 				if name == "1.3.6.1.4.1.1466.20037" && server.StartTLS != nil && !connectionTLSActive {
 					responseType := uint8(ApplicationExtendedResponse)
-					// start tls
-					// log.Println("START_TLS")
-					// ber.PrintPacket(req)
 					ldapResultCode := LDAPResultCode(LDAPResultSuccess)
 					responsePacket := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "LDAP Response")
 					responsePacket.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagInteger, messageID, "Message ID"))
@@ -339,8 +336,6 @@ handler:
 					response.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, "", "errorMessage: "))
 					response.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, TagResponseName, name, "responseName: "))
 					responsePacket.AppendChild(response)
-					// log.Println("START_TLS response")
-					// ber.PrintPacket(responsePacket)
 					if err = sendPacket(conn, responsePacket); err != nil {
 						log.Printf("sendPacket error %s", err.Error())
 						break handler
@@ -449,7 +444,7 @@ func encodeLDAPResponse(messageID uint64, responseType uint8, ldapResultCode LDA
 
 type defaultHandler struct{}
 
-func (h defaultHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (h defaultHandler) Bind(request BindRequest, conn net.Conn) (LDAPResultCode, error) {
 	return LDAPResultInvalidCredentials, nil
 }
 
