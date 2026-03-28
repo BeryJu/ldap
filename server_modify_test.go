@@ -93,8 +93,8 @@ func TestModifyDN(t *testing.T) {
 
 type modifyTestHandler struct{}
 
-func (h modifyTestHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
-	if bindDN == "" && bindSimplePw == "" {
+func (h modifyTestHandler) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
+	if req.BindDN == "" && req.Password == "" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInvalidCredentials, nil

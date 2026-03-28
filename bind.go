@@ -5,10 +5,27 @@
 package ldap
 
 import (
+	"context"
+	"crypto/tls"
 	"errors"
 
-	"github.com/nmcclain/asn1-ber"
+	ber "github.com/nmcclain/asn1-ber"
 )
+
+type BindType = string
+
+const (
+	BindTypeSimple       BindType = "simple"
+	BindTypeSASLExternal BindType = "external"
+)
+
+type BindRequest struct {
+	BindDN   string
+	Password string
+	Type     BindType
+	Context  context.Context
+	TLS      *tls.ConnectionState
+}
 
 func (l *Conn) Bind(username, password string) error {
 	messageID := l.nextMessageID()

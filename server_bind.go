@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"crypto/tls"
 	"log"
 	"net"
 
@@ -41,7 +42,12 @@ func HandleBindRequest(req *ber.Packet, fns map[string]Binder, conn net.Conn) (r
 				fnNames = append(fnNames, k)
 			}
 			fn := routeFunc(bindDN, fnNames)
-			resultCode, err := fns[fn].Bind(bindDN, bindAuth.Data.String(), conn)
+			req := BindRequest{
+				BindDN:   bindDN,
+				Password: bindAuth.Data.String(),
+				Type:     BindTypeSimple,
+			}
+			resultCode, err := fns[fn].Bind(req, conn)
 			if err != nil {
 				log.Printf("BindFn Error %s", err.Error())
 				return LDAPResultOperationsError
@@ -52,8 +58,33 @@ func HandleBindRequest(req *ber.Packet, fns map[string]Binder, conn net.Conn) (r
 			return LDAPResultInappropriateAuthentication
 		}
 	case LDAPBindAuthSASL:
-		log.Print("SASL authentication is not supported")
-		return LDAPResultInappropriateAuthentication
+		if _, ok := conn.(*tls.Conn); !ok {
+			log.Print("SASL auth only supported over TLS/SSL")
+			return LDAPResultInappropriateAuthentication
+		}
+		if len(req.Children) == 3 {
+			fnNames := []string{}
+			for k := range fns {
+				fnNames = append(fnNames, k)
+			}
+			fn := routeFunc(bindDN, fnNames)
+			st := conn.(*tls.Conn).ConnectionState()
+			req := BindRequest{
+				BindDN:   bindDN,
+				Password: bindAuth.Data.String(),
+				Type:     BindTypeSASLExternal,
+				TLS:      &st,
+			}
+			resultCode, err := fns[fn].Bind(req, conn)
+			if err != nil {
+				log.Printf("BindFn Error %s", err.Error())
+				return LDAPResultOperationsError
+			}
+			return resultCode
+		} else {
+			log.Print("Simple bind request has wrong # children.  len(req.Children) != 3")
+			return LDAPResultInappropriateAuthentication
+		}
 	}
 }
 

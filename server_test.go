@@ -233,8 +233,8 @@ func TestSearchStats(t *testing.T) {
 // ///////////////////////
 type bindAnonOK struct{}
 
-func (b bindAnonOK) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
-	if bindDN == "" && bindSimplePw == "" {
+func (b bindAnonOK) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
+	if req.BindDN == "" && req.Password == "" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInvalidCredentials, nil
@@ -242,8 +242,8 @@ func (b bindAnonOK) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResult
 
 type bindSimple struct{}
 
-func (b bindSimple) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
-	if bindDN == "cn=testy,o=testers,c=test" && bindSimplePw == "iLike2test" {
+func (b bindSimple) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
+	if req.BindDN == "cn=testy,o=testers,c=test" && req.Password == "iLike2test" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInvalidCredentials, nil
@@ -251,8 +251,8 @@ func (b bindSimple) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResult
 
 type bindSimple2 struct{}
 
-func (b bindSimple2) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
-	if bindDN == "cn=testy,o=testers,c=testz" && bindSimplePw == "ZLike2test" {
+func (b bindSimple2) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
+	if req.BindDN == "cn=testy,o=testers,c=testz" && req.Password == "ZLike2test" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInvalidCredentials, nil
@@ -260,14 +260,14 @@ func (b bindSimple2) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResul
 
 type bindPanic struct{}
 
-func (b bindPanic) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindPanic) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
 	panic("test panic at the disco")
 }
 
 type bindCaseInsensitive struct{}
 
-func (b bindCaseInsensitive) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
-	if strings.ToLower(bindDN) == "cn=case,o=testers,c=test" && bindSimplePw == "iLike2test" {
+func (b bindCaseInsensitive) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error) {
+	if strings.ToLower(req.BindDN) == "cn=case,o=testers,c=test" && req.Password == "iLike2test" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInvalidCredentials, nil
