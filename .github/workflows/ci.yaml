@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["1.14", "1.19", "1.20"]
+        go: ["oldstable", "stable"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
