@@ -20,11 +20,12 @@ const (
 )
 
 type BindRequest struct {
-	BindDN   string
-	Password string
-	Type     BindType
-	Context  context.Context
-	TLS      *tls.ConnectionState
+	BindDN         string
+	Password       string
+	Type           BindType
+	Context        context.Context
+	TLS            *tls.ConnectionState
+	SASLCredential string
 }
 
 func (l *Conn) Bind(username, password string) error {

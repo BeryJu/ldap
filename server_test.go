@@ -116,16 +116,28 @@ func TestBindSASLExternal(t *testing.T) {
 	s.BindFunc("", bindSimple{})
 
 	serverBaseDN := "o=testers,c=test"
+	bindDN := "cn=testy," + serverBaseDN
 
 	LaunchServerForTest(t, s, func() {
-		cmd := exec.Command("ldapsearch", "-H", ldapURL,
-			"-b", serverBaseDN, "-D", "cn=testy,"+serverBaseDN, "-ZZ", "-Y", "EXTERNAL")
-		cmd.Env = append(cmd.Env, "LDAPTLS_CACERT=tests/ca.pem")
-		cmd.Env = append(cmd.Env, "LDAPTLS_CERT=tests/cert_client.pem")
-		cmd.Env = append(cmd.Env, "LDAPTLS_KEY=tests/cert_client.key")
-		out, _ := cmd.CombinedOutput()
-		if !strings.Contains(string(out), "result: 0 Success") {
-			t.Errorf("ldapsearch failed: %v", string(out))
+		cmds := [][]string{
+			{"ldapsearch", "-H", ldapURL, "-b", serverBaseDN, "-ZZ", "-Y", "EXTERNAL", "-D", bindDN},
+			{"ldapsearch", "-H", ldapURL, "-b", serverBaseDN, "-ZZ", "-Y", "EXTERNAL", "-X", "dn:" + bindDN},
+		}
+		for _, cmd := range cmds {
+			t.Run(strings.Join(cmd, " "), func(t *testing.T) {
+				cmd := exec.Command(cmd[0], cmd[1:]...)
+				cmd.Env = append(cmd.Env, "LDAPTLS_CACERT=tests/ca.pem")
+				cmd.Env = append(cmd.Env, "LDAPTLS_CERT=tests/cert_client.pem")
+				cmd.Env = append(cmd.Env, "LDAPTLS_KEY=tests/cert_client.key")
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					t.Error(err)
+				}
+				t.Log(string(out))
+				if !strings.Contains(string(out), "result: 0 Success") {
+					t.Errorf("ldapsearch failed: %v", string(out))
+				}
+			})
 		}
 	})
 }
@@ -277,7 +289,7 @@ func (b bindSimple) Bind(req BindRequest, conn net.Conn) (LDAPResultCode, error)
 	if req.BindDN == "cn=testy,o=testers,c=test" && req.Password == "iLike2test" {
 		return LDAPResultSuccess, nil
 	}
-	if req.TLS != nil && req.TLS.PeerCertificates[0].Subject.String() == "CN=client" {
+	if req.BindDN == "cn=testy,o=testers,c=test" && req.TLS != nil && req.TLS.PeerCertificates[0].Subject.String() == "CN=client" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInvalidCredentials, nil

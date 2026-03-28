@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"log"
 	"net"
+	"strings"
 
 	ber "github.com/nmcclain/asn1-ber"
 )
@@ -70,10 +71,17 @@ func HandleBindRequest(req *ber.Packet, fns map[string]Binder, conn net.Conn) (r
 			fn := routeFunc(bindDN, fnNames)
 			st := conn.(*tls.Conn).ConnectionState()
 			req := BindRequest{
-				BindDN:   bindDN,
-				Password: bindAuth.Data.String(),
-				Type:     BindTypeSASLExternal,
-				TLS:      &st,
+				BindDN: bindDN,
+				Type:   BindTypeSASLExternal,
+				TLS:    &st,
+			}
+			if len(bindAuth.Children) > 1 {
+				req.SASLCredential = bindAuth.Children[1].Data.String()
+			}
+			// For convenicen, if the client didn't send us a Bind DN but the SASL Credential has one,
+			// use it instead
+			if req.BindDN == "" && strings.HasPrefix(req.SASLCredential, "dn:") {
+				req.BindDN = strings.TrimPrefix(req.SASLCredential, "dn:")
 			}
 			resultCode, err := fns[fn].Bind(req, conn)
 			if err != nil {
