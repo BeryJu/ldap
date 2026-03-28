@@ -19,6 +19,7 @@ var (
 )
 
 func LaunchWorkerForTest(t *testing.T, worker func(should_quit chan (bool)), test func()) {
+	t.Helper()
 	worker_should_quit := make(chan bool)
 	worker_has_quit := make(chan bool)
 	test_done := make(chan bool)
@@ -49,6 +50,7 @@ func LaunchWorkerForTest(t *testing.T, worker func(should_quit chan (bool)), tes
 }
 
 func LaunchServerForTest(t *testing.T, s *Server, test func()) {
+	t.Helper()
 	LaunchWorkerForTest(t, func(server_should_quit chan (bool)) {
 		s.QuitChannel(server_should_quit)
 		if err := s.ListenAndServe(listenString); err != nil {
@@ -142,7 +144,7 @@ func TestBindSSL(t *testing.T) {
 		s := NewServer()
 		s.QuitChannel(server_should_quit)
 		s.BindFunc("", bindAnonOK{})
-		if err := s.ListenAndServeTLS(listenString, "tests/cert_DONOTUSE.pem", "tests/key_DONOTUSE.pem"); err != nil {
+		if err := s.ListenAndServeTLS(listenString, "tests/cert_server.pem", "tests/cert_server.key"); err != nil {
 			t.Errorf("s.ListenAndServeTLS failed: %s", err.Error())
 		}
 	}, func() {
@@ -162,7 +164,7 @@ func TestBindStartTLS(t *testing.T) {
 		s := NewServer()
 		s.QuitChannel(server_should_quit)
 		s.BindFunc("", bindAnonOK{})
-		cert, err := tls.LoadX509KeyPair("tests/cert_DONOTUSE.pem", "tests/key_DONOTUSE.pem")
+		cert, err := tls.LoadX509KeyPair("tests/cert_server.pem", "tests/cert_server.key")
 		if err != nil {
 			t.Error(err)
 		}
