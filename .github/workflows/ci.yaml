@@ -24,13 +24,14 @@ jobs:
       - name: Build
         run: go build -v ./...
       - name: Test
-        run: go test \
-          -v \
-          -shuffle=on \
-          -coverprofile=coverage.txt \
-          -covermode=atomic \
-          -coverpkg=../... \
-          ./...
+        run: |
+          go test \
+            -v \
+            -shuffle=on \
+            -coverprofile=coverage.txt \
+            -covermode=atomic \
+            -coverpkg=../... \
+            ./...
       - uses: codecov/codecov-action@v6
         with:
           use_oidc: true
