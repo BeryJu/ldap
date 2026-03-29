@@ -4,7 +4,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/nmcclain/asn1-ber"
+	ber "github.com/nmcclain/asn1-ber"
 )
 
 func HandleAddRequest(req *ber.Packet, boundDN string, fns map[string]Adder, conn net.Conn) (resultCode LDAPResultCode) {
@@ -131,7 +131,7 @@ func HandleCompareRequest(req *ber.Packet, boundDN string, fns map[string]Compar
 	}
 	var ok bool
 	compReq := CompareRequest{}
-	compReq.dn, ok = req.Children[0].Value.(string)
+	compReq.DN, ok = req.Children[0].Value.(string)
 	if !ok {
 		return LDAPResultProtocolError
 	}
@@ -147,7 +147,7 @@ func HandleCompareRequest(req *ber.Packet, boundDN string, fns map[string]Compar
 	if !ok {
 		return LDAPResultProtocolError
 	}
-	compReq.ava = []AttributeValueAssertion{{attr, val}}
+	compReq.AVA = []AttributeValueAssertion{{attr, val}}
 	fnNames := []string{}
 	for k := range fns {
 		fnNames = append(fnNames, k)

@@ -175,12 +175,12 @@ type ModifyDNRequest struct {
 	newSuperior  string
 }
 type AttributeValueAssertion struct {
-	attributeDesc  string
-	assertionValue string
+	AttributeDesc  string
+	AssertionValue string
 }
 type CompareRequest struct {
-	dn  string
-	ava []AttributeValueAssertion
+	DN  string
+	AVA []AttributeValueAssertion
 }
 type ExtendedRequest struct {
 	requestName  string
