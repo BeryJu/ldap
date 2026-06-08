@@ -36,6 +36,6 @@ jobs:
             -covermode=atomic \
             -coverpkg=../... \
             ./...
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@v7
         with:
           use_oidc: true
